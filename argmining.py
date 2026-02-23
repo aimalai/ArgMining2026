@@ -24,11 +24,46 @@ folders = [
 ]
 
 # Comment out after initial execution
-for folder in folders:
-    os.makedirs(os.path.join(PROJECT_ROOT, folder), exist_ok=True)
+# for folder in folders:
+#    os.makedirs(os.path.join(PROJECT_ROOT, folder), exist_ok=True)
 
-print(f"✅ Success! Your research structure is ready at: {os.path.abspath(PROJECT_ROOT)}")
+#print(f"✅ Success! Your research structure is ready at: {os.path.abspath(PROJECT_ROOT)}")
 
-# CHANGE 3: The "Emergency Brake"
-# This stops the script here so it doesn't try to run Colab code below.
-sys.exit("Stopping here: Folder structure created. Next step: Data Download.")
+
+# Data Acquisition and Environment Setup
+# Authenticates with Hugging Face using a secure token and downloads the ArgMining 2026 dataset (UN Resolutions) into the project's raw data directory.
+
+import os
+from huggingface_hub import login
+# from google.colab import userdata  # Removed for Cluster compatibility
+
+# Retrieve the token from environment variables (Cluster equivalent to Colab Secrets)
+hf_token = os.getenv('HF_TOKEN')
+login(token=hf_token)
+
+# !pip install -q huggingface_hub  # Removed for Cluster compatibility
+
+from huggingface_hub import snapshot_download
+#import os
+
+# Define the dataset path inside your project
+RAW_DATA_PATH = os.path.join(PROJECT_ROOT, 'data/raw')
+
+# Download the ArgMining 2026 dataset
+# This pulls the UN resolutions (English/French) and the test set
+repo_id = "ZurichNLP/ArgMining-2026-UZH-Shared-Task"
+
+print("Downloading dataset from Hugging Face...")
+snapshot_download(
+    repo_id=repo_id,
+    repo_type="dataset",
+    local_dir=RAW_DATA_PATH,
+    local_dir_use_symlinks=False
+)
+
+print(f"✅ Data successfully downloaded to: {RAW_DATA_PATH}")
+# List the files to make sure everything is there
+print("Files in data/raw:", os.listdir(RAW_DATA_PATH))
+
+# The "Emergency Brake"
+sys.exit("Stopping here: Folder structure created and Data downloaded. Next step: Processing.")
