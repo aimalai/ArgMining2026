@@ -25,34 +25,28 @@ folders = [
 
 # Comment out after initial execution
 # for folder in folders:
-#    os.makedirs(os.path.join(PROJECT_ROOT, folder), exist_ok=True)
+#     os.makedirs(os.path.join(PROJECT_ROOT, folder), exist_ok=True)
 
-#print(f"✅ Success! Your research structure is ready at: {os.path.abspath(PROJECT_ROOT)}")
+# print(f"✅ Success! Your research structure is ready at: {os.path.abspath(PROJECT_ROOT)}")
 
 
 # Data Acquisition and Environment Setup
 # Authenticates with Hugging Face using a secure token and downloads the ArgMining 2026 dataset (UN Resolutions) into the project's raw data directory.
 
-import os
 from huggingface_hub import login
-# from google.colab import userdata  # Removed for Cluster compatibility
+from huggingface_hub import snapshot_download
 
 # Retrieve the token from environment variables (Cluster equivalent to Colab Secrets)
-hf_token = os.getenv('HF_TOKEN')
-login(token=hf_token)
-
-# !pip install -q huggingface_hub  # Removed for Cluster compatibility
-
-from huggingface_hub import snapshot_download
-#import os
+# hf_token = os.getenv('HF_TOKEN')
+# login(token=hf_token)
 
 # Define the dataset path inside your project
 RAW_DATA_PATH = os.path.join(PROJECT_ROOT, 'data/raw')
 
 # Download the ArgMining 2026 dataset
-# This pulls the UN resolutions (English/French) and the test set
+# Commented out as data is already downloaded
+"""
 repo_id = "ZurichNLP/ArgMining-2026-UZH-Shared-Task"
-
 print("Downloading dataset from Hugging Face...")
 snapshot_download(
     repo_id=repo_id,
@@ -60,10 +54,179 @@ snapshot_download(
     local_dir=RAW_DATA_PATH,
     local_dir_use_symlinks=False
 )
+"""
 
-print(f"✅ Data successfully downloaded to: {RAW_DATA_PATH}")
-# List the files to make sure everything is there
-print("Files in data/raw:", os.listdir(RAW_DATA_PATH))
+# Training Data Validation and Schema Inspection
+# Verifies dataset integrity by loading a sample JSON file to confirm presence, resolve schema structure (list vs. dict), and preview key metadata and English content.
+
+import json
+
+# Identify training directory and all associated paragraph files
+TRAIN_DATA_DIR = os.path.join(PROJECT_ROOT, 'data/raw/train-data')
+all_files = [f for f in os.listdir(TRAIN_DATA_DIR) if f.endswith('.json')]
+
+if not all_files:
+    print("❌ No JSON files found. Ensure data download was successful.")
+else:
+    # Select first available sample for structural validation
+    sample_path = os.path.join(TRAIN_DATA_DIR, all_files[0])
+    with open(sample_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # UN-RES dataset often packages paragraphs in single-item lists;
+    # this logic ensures compatibility across different parsing versions.
+    para_data = data[0] if isinstance(data, list) and len(data) > 0 else data
+
+    print(f"✅ Success! File: {all_files[0]}")
+    print(f"📌 Paragraph Type: {para_data.get('type', 'Unknown')}")
+    print(f"📏 Structure Level: {para_data.get('level', 'N/A')}")
+
+    # Isolate English translation for Semantic Entropy analysis (ML4NLP2 Focus)
+    english_text = para_data.get('text_en', 'N/A')
+    print("\n--- English Content (text_en) ---")
+    print(f"{english_text[:300]}...")
+
+
+# Quantized Model Instantiation
+# Loads the Llama-3-8B-Instruct model with 4-bit Normal Float (NF4) quantization to minimize memory footprint while maintaining inference fidelity on the GPU.
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+model_id = "meta-llama/Llama-3.1-8B-Instruct"
+
+# 2. 4-bit config is what makes this "Innovation Grant" material!
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True
+)
+
+# 3. Load Tokenizer and Model
+tokenizer = AutoTokenizer.from_pretrained(model_id, token=hf_token)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    quantization_config=bnb_config,
+    device_map="auto", # This sends it to the GPU automatically
+    token=hf_token
+)
+
+print("🚀 8B Engine Ready to calculate Entropy on GPU!")
+
+
+# Semantic Entropy Metric Definition
+# Calculates the average token-level entropy (H) to quantify model uncertainty, serving as the primary metric for identifying and pruning high-noise text segments.
+
+import torch.nn.functional as F
+import numpy as np
+
+def calculate_semantic_entropy(text, model, tokenizer):
+    """
+    Core Research Metric: Calculates average token-level entropy.
+    Higher Score = Higher model uncertainty/noise.
+    """
+    # 1. Prepare input
+    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+
+    with torch.no_grad():
+        # 2. Get model predictions (logits)
+        outputs = model(**inputs)
+        logits = outputs.logits # Shape: [1, seq_len, vocab_size]
+
+        # 3. Convert to probabilities
+        probs = F.softmax(logits, dim=-1)
+
+        # 4. Calculate Entropy: H = -sum(p * log(p))
+        # We add a tiny 1e-10 to avoid log(0) errors
+        entropy = -torch.sum(probs * torch.log(probs + 1e-10), dim=-1)
+
+        # 5. Average across all tokens in the paragraph
+        mean_entropy = torch.mean(entropy).item()
+
+    return mean_entropy
+
+# --- TEST ---
+# Use the 'english_text' from our previous data inspector cell
+if 'english_text' in locals():
+    score = calculate_semantic_entropy(english_text, model, tokenizer)
+    print(f"📊 Success! Semantic Entropy for first paragraph: {score:.4f}")
+else:
+    print("❌ Run your 'Data Inspector' cell first to define english_text!")
+
+
+# Pilot Batch Processing and Entropy Benchmarking
+# Executes the semantic entropy calculation across a sample dataset to establish baseline metrics, saving the aggregated results to a CSV file for preliminary analysis.
+
+import pandas as pd
+from tqdm import tqdm # Provides a progress bar
+
+# 1. Define how many files to process for this first "pilot" run
+BATCH_SIZE = 50
+results = []
+
+print(f"🚀 Starting Batch Process for {BATCH_SIZE} paragraphs...")
+
+for filename in tqdm(all_files[:BATCH_SIZE]):
+    file_path = os.path.join(TRAIN_DATA_DIR, filename)
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # Handle the list structure we discovered earlier
+    para_data = data[0] if isinstance(data, list) and len(data) > 0 else data
+    text_en = para_data.get('text_en', '')
+    para_type = para_data.get('type', 'unknown')
+
+    if text_en:
+        # Calculate entropy using our 8B Engine
+        entropy_val = calculate_semantic_entropy(text_en, model, tokenizer)
+
+        results.append({
+            'filename': filename,
+            'type': para_type,
+            'entropy': entropy_val,
+            'text_length': len(text_en)
+        })
+
+# 2. Convert to DataFrame and save to your Project Folder
+df_results = pd.DataFrame(results)
+output_path = os.path.join(PROJECT_ROOT, 'data/entropy_pilot_results.csv')
+df_results.to_csv(output_path, index=False)
+
+print(f"\n✅ Batch Complete! Results saved to: {output_path}")
+
+
+# Exploratory Data Analysis and Visualization
+# Generates a histogram of semantic entropy distributions by paragraph type to visualize model uncertainty and calculates descriptive statistics for the grant proposal.
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Set the style for a professional research paper look
+sns.set_theme(style="whitegrid")
+plt.figure(figsize=(10, 6))
+
+# Create the histogram
+ax = sns.histplot(data=df_results, x='entropy', hue='type', kde=True, bins=15, palette='viridis')
+
+# Add titles and labels for your grant proposal
+plt.title('Distribution of Semantic Entropy in UN Paragraphs', fontsize=15)
+plt.xlabel('Semantic Entropy Score (Uncertainty)', fontsize=12)
+plt.ylabel('Frequency (Number of Paragraphs)', fontsize=12)
+
+# Save the plot to your project folder for your paper
+plot_path = os.path.join(PROJECT_ROOT, 'experiments/entropy_distribution.png')
+plt.savefig(plot_path)
+
+# plt.show() # Disabled for Cluster use
+
+print(f"✅ Visualization complete! Chart saved to: {plot_path}")
+
+# Quick Insight for your paper:
+mean_by_type = df_results.groupby('type')['entropy'].mean()
+print("\n📊 Average Entropy by Category:")
+print(mean_by_type)
 
 # The "Emergency Brake"
-sys.exit("Stopping here: Folder structure created and Data downloaded. Next step: Processing.")
+sys.exit("Stopping here: EDA complete. Next step: Classification.")
