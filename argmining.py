@@ -13,6 +13,8 @@ import sys
 
 # To stop any "Thread Limit" crash
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+os.environ["TQDM_DISABLE"] = "True"
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 # relative path so it works on any machine/cluster
 PROJECT_ROOT = './ArgMining_2026_Project'
