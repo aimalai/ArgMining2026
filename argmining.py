@@ -37,7 +37,7 @@ from huggingface_hub import login
 from huggingface_hub import snapshot_download
 
 # Retrieve the token from environment variables (Cluster equivalent to Colab Secrets)
-# hf_token = os.getenv('HF_TOKEN')
+hf_token = os.getenv('HF_TOKEN')
 # login(token=hf_token)
 
 # Define the dataset path inside your project
