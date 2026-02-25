@@ -294,7 +294,7 @@ def process_full_resolution_v2(file_path, model, tokenizer):
         data = json.load(f)
     
     # Adapt to structure found in cluster validation cell
-    raw_paras = data[0] if isinstance(data, list) else data.get('body', {}).get('paras', [])
+    raw_paras = data if isinstance(data, list) else [data]
     
     processed_paras = []
     prev_text = "None (Start of Document)"
