@@ -81,7 +81,7 @@ else:
     print(f"📌 Paragraph Type: {para_data.get('type', 'Unknown')}")
     print(f"📏 Structure Level: {para_data.get('level', 'N/A')}")
 
-    # Isolate English translation for Semantic Entropy analysis (ML4NLP2 Focus)
+    # Isolate English translation for Semantic Entropy analysis 
     english_text = para_data.get('text_en', 'N/A')
     print("\n--- English Content (text_en) ---")
     print(f"{english_text[:300]}...")
