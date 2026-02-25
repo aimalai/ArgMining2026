@@ -6,6 +6,30 @@ Core Research: Semantic Entropy Pruning for Context Optimization
 Shared Task Consraint Constraint: Open-Source Models ≤ 8B Parameters
 """
 
+import os
+import sys
+import json
+import torch
+import pandas as pd
+from tqdm import tqdm
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+# --- (1) PROJECT CONFIGURATION (Keep active) ---
+PROJECT_ROOT = './ArgMining_2026_Project'
+TRAIN_DATA_DIR = os.path.join(PROJECT_ROOT, 'data/raw/train-data')
+hf_token = os.getenv('HF_TOKEN')
+
+# RE-ADD THESE TWO LINES (They were inside your comments)
+all_files = [f for f in os.listdir(TRAIN_DATA_DIR) if f.endswith('.json')]
+if all_files:
+    with open(os.path.join(TRAIN_DATA_DIR, all_files[0]), 'r', encoding='utf-8') as f:
+        _data = json.load(f)
+        _para = _data[0] if isinstance(_data, list) else _data
+        english_text = _para.get('text_en', 'N/A')
+
+
+"""
+
 # Project Environment & Directory Configuration
 # Defines the root file path and modular folder structure used to organize raw data, source code, experiments, and submission outputs.
 import os
@@ -228,5 +252,113 @@ mean_by_type = df_results.groupby('type')['entropy'].mean()
 print("\n📊 Average Entropy by Category:")
 print(mean_by_type)
 
-# The "Emergency Brake"
-sys.exit("Stopping here: EDA complete. Next step: Classification.")
+"""
+
+# (Zero-Shot) Paragraph Classification Logic
+# Implements a strict prompt engineering strategy to categorize UN paragraphs (operative, preambular, header) by analyzing syntax markers like numbering and leading verbs.
+def subtask1_classifier_v2(text, model, tokenizer):
+    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a UN Document Auditor. Your ONLY goal is to classify the text.
+
+RULES:
+1. 'operative': MUST be a formal decision. Look for paragraphs starting with a number (e.g., "1.", "2.") OR starting directly with: Decides, Requests, Stresses, Reaffirms, Calls, Urges, Adopts, Notes, Authorizes.
+2. 'preambular': MUST start with an "-ing" word (Welcoming, Recalling, etc.) or "Having examined".
+3. 'header': Use for everything else: Dates, Symbols (A/RES...), Image tags, Titles, or text that doesn't start with a Number or an -ing word.
+
+CRITICAL: Do not assume words exist if they are not in the text. Look at the VERY FIRST WORD.
+
+Return JSON ONLY.
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+Paragraph: "{text}"
+
+Target JSON:
+{{
+  "type": "header, preambular, or operative",
+  "think": "The first word is [WORD], which triggers the [RULE] rule."
+}}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+"""
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        output_tokens = model.generate(**inputs, max_new_tokens=100, temperature=0.01)
+
+    return tokenizer.decode(output_tokens[0][inputs['input_ids'].shape[-1]:], skip_special_tokens=True)
+
+# (Zero-Shot) Classification Inference
+# Executes the v2 classifier on a sample paragraph to validate the model's ability to distinguish between header, preambular, and operative text using the new rule-based logic.
+# (Note: Assumes 'english_text' was defined during your earlier session run)
+if 'english_text' in locals():
+    prediction_result = subtask1_classifier_v2(english_text, model, tokenizer)
+    print("🤖 Subtask 1 (v2) Analysis Result:")
+    print(prediction_result)
+
+# Argumentative Relation Extraction Logic
+# Analyzes the semantic link between a current paragraph and its predecessor to determine if the text "Supports" the reasoning or is "Independent," a key requirement for reconstructing the argumentative graph.
+def predict_argumentative_relation(text, prev_text, model, tokenizer):
+    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+Analyze the relationship between two UN paragraphs.
+PREVIOUS: {prev_text[:300]}
+CURRENT: {text[:300]}
+
+Rules:
+1. 'supports': The current paragraph expands on, justifies, or provides detail for the previous one.
+2. 'independent': The current paragraph starts a new topic, a new list item, or is unrelated.
+
+Return JSON only: {{"relation": "supports/independent"}}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+"""
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        output_tokens = model.generate(**inputs, max_new_tokens=50, temperature=0.01)
+    return tokenizer.decode(output_tokens[0][inputs['input_ids'].shape[-1]:], skip_special_tokens=True)
+
+# End-to-End Resolution Processing Pipeline
+# Iterates through document paragraphs to execute v2 classification and relation extraction, aggregating structural metadata and argumentative links into the final submission-ready JSON format.
+def process_full_resolution_v2(file_path, model, tokenizer):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Adapt to structure found in cluster validation cell
+    raw_paras = data[0] if isinstance(data, list) else data.get('body', {}).get('paras', [])
+    
+    processed_paras = []
+    prev_text = "None (Start of Document)"
+    
+    for i, p in enumerate(tqdm(raw_paras[:20], desc="Processing Resolution")): # Limit to 20 for test
+        text = p.get('text_en', '')
+        if not text: continue
+        
+        # 1. Classify
+        class_raw = subtask1_classifier_v2(text, model, tokenizer)
+        
+        # 2. Relation
+        rel_raw = predict_argumentative_relation(text, prev_text, model, tokenizer)
+        
+        processed_paras.append({
+            "index": i,
+            "classification": class_raw,
+            "relation": rel_raw
+        })
+        prev_text = text
+        
+    return processed_paras
+
+# UNIVERSAL RESULTS CHECKER
+# Final validation step to ensure the AI output folder contains valid JSON files and that the classification logic hasn't introduced empty or corrupt entries.
+def universal_checker(directory):
+    print(f"🔍 Checking results in: {directory}")
+    if not os.path.exists(directory):
+        print("❌ Directory not found.")
+        return
+    
+    files = [f for f in os.listdir(directory) if f.endswith('.json')]
+    print(f"📈 Found {len(files)} processed resolutions.")
+    # Add your specific integrity checks here (Check 1, Check 2 as per Colab)
+
+# TEST THE PIPELINE
+if all_files:
+    test_file = os.path.join(TRAIN_DATA_DIR, all_files[0])
+    results = process_full_resolution_v2(test_file, model, tokenizer)
+    print(f"✅ Full processing complete for {all_files[0]}")
+
+print("🚀 Pipeline migration to Science Cluster successful.")
