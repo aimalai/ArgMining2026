@@ -336,4 +336,119 @@ if all_files:
     results = process_full_resolution_v2(test_file, model, tokenizer)
     print(f"✅ Full processing complete for {all_files[0]}")
 
+# Multi-Task Argument Mining Inference Engine
+# Orchestrates joint classification, thematic tagging, and relation extraction within a single structured prompt to produce competition-compliant JSON outputs.
+
+import json
+import torch
+
+def competition_final_processor(text, prev_text, prev_idx, model, tokenizer):
+    # Contextual check for the first paragraph
+    context_info = f"PREVIOUS PARA [Index {prev_idx}]: \"{prev_text}\"" if prev_idx is not None else "This is the start of the document."
+
+    # We feed the 'Dimensions' from your CSV directly into the prompt to guide tagging
+    prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a UNESCO Legal-Political Analyst. Your task is to perform Argument Mining on an Education Conference document.
+
+OUTPUT REQUIREMENTS:
+1. TYPE: Classify as 'preambular' or 'operative'.
+2. TAGS: Assign 1-3 labels from the Education Dimensions (e.g., Teachers, Curriculum, Education level, Policy theme).
+3. RELATIONS: Link to Index {prev_idx if prev_idx is not None else 'N/A'}.
+    Types: "supporting", "contradictive", "complemental", "modifying".
+4. THINK: Provide a brief reasoning string for your choices.
+
+Return JSON ONLY.
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+{context_info}
+CURRENT PARA: "{text}"
+
+Target JSON:
+{{
+  "type": "preambular/operative",
+  "tags": ["Tag1", "Tag2"],
+  "matched_paras": {{"{prev_idx if prev_idx is not None else 'null'}": "relation_type"}},
+  "think": "Your step-by-step reasoning here."
+}}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+"""
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        # Keep temperature low for high structural accuracy
+        output_tokens = model.generate(**inputs, max_new_tokens=250, temperature=0.01)
+
+    return tokenizer.decode(output_tokens[0][inputs['input_ids'].shape[-1]:], skip_special_tokens=True)
+
+
+# Production Inference Loop and Leaderboard Serialization
+# Iterates through the UNESCO test dataset to perform high-resolution argument mining, updating resolution metadata and saving final competition-ready JSON files.
+
+import os
+import json
+import time
+
+# --- CONFIGURATION ---
+# Adapted for Science Cluster Project Structure
+TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "data/raw/test-data/")
+FINAL_SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission/")
+os.makedirs(FINAL_SUBMISSION_DIR, exist_ok=True)
+
+test_files = [f for f in os.listdir(TEST_DATA_DIR) if f.endswith('.json')]
+
+print(f"🚀 PRO RUN (Take 2): Processing {len(test_files)} UNESCO Test Files...")
+
+for f_idx, file_name in enumerate(test_files):
+    file_path = os.path.join(TEST_DATA_DIR, file_name)
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    # TARGETING THE CORRECT KEY: 'paragraphs'
+    paras = data.get('body', {}).get('paragraphs', [])
+
+    if not paras:
+        print(f"❌ ERROR: No paragraphs found in {file_name}. Still looking for wrong key?")
+        continue
+
+    print(f"📈 [{f_idx+1}/{len(test_files)}] Analyzing {len(paras)} paras in: {file_name}")
+
+    op_indices = []
+    pre_indices = []
+    prev_text = None
+    prev_idx = None
+
+    for i, p in enumerate(paras):
+        # UNESCO Test Set uses 'para_en'
+        current_text = p.get('para_en', "")
+
+        # Call our specialized UNESCO engine (Ensure this function is defined!)
+        raw_response = competition_final_processor(current_text, prev_text, prev_idx, model, tokenizer)
+
+        try:
+            clean_json = raw_response.strip().replace('```json', '').replace('```', '')
+            res = json.loads(clean_json)
+
+            p['type'] = res.get('type', 'header')
+            p['tags'] = res.get('tags', [])
+            p['matched_paras'] = res.get('matched_paras', {})
+            p['think'] = res.get('think', "")
+
+            if p['type'] == 'operative': op_indices.append(i)
+            if p['type'] == 'preambular': pre_indices.append(i)
+
+        except Exception as e:
+            p['type'] = 'header'
+
+        prev_text = current_text
+        prev_idx = i
+
+    # Sync the METADATA structure for UZH requirements
+    data['METADATA']['structure']['preambular_para'] = pre_indices
+    data['METADATA']['structure']['operative_para'] = op_indices
+    data['METADATA']['structure']['think'] = "Llama-3.1-8B: UNESCO Education Specialized Run."
+
+    # Save to the new clean folder
+    with open(os.path.join(FINAL_SUBMISSION_DIR, file_name), 'w') as out_f:
+        json.dump(data, out_f, indent=2)
+
+print(f"🏁 DONE! Real processing complete.")
+
 print("🚀 Pipeline migration to Science Cluster successful.")
