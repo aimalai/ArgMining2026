@@ -397,6 +397,10 @@ test_files = [f for f in os.listdir(TEST_DATA_DIR) if f.endswith('.json')]
 print(f"🚀 PRO RUN (Take 2): Processing {len(test_files)} UNESCO Test Files...")
 
 for f_idx, file_name in enumerate(test_files):
+    # --- So that re-running completed test files doesn't happen ---
+    if os.path.exists(os.path.join(FINAL_SUBMISSION_DIR, file_name)):
+        continue 
+    # ---------------------------------
     file_path = os.path.join(TEST_DATA_DIR, file_name)
     with open(file_path, 'r') as f:
         data = json.load(f)
