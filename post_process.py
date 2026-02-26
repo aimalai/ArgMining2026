@@ -16,6 +16,34 @@ from collections import OrderedDict
 # Define your project path
 PROJECT_ROOT = './ArgMining_2026_Project'
 
+# MODEL LOADING FOR SCIENCE BENCHMARKS
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+# Retrieve the token from environment variables
+hf_token = os.getenv('HF_TOKEN')
+model_id = "meta-llama/Llama-3.1-8B-Instruct"
+
+# 4-bit config for efficient cluster memory usage
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True
+)
+
+# Load Tokenizer and Model
+tokenizer = AutoTokenizer.from_pretrained(model_id, token=hf_token)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    quantization_config=bnb_config,
+    device_map="auto", 
+    token=hf_token
+)
+
+print("🚀 8B Engine Loaded in post_process.py for Science Benchmarking!")
+# --------------------------------------------
+
 def LatencyTracker(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
