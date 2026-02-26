@@ -4,6 +4,8 @@
 import time
 from functools import wraps
 
+PROJECT_ROOT = './ArgMining_2026_Project'
+
 def LatencyTracker(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
