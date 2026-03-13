@@ -339,7 +339,10 @@ if all_files:
 # Multi-Task Argument Mining Inference Engine
 # Orchestrates joint classification, thematic tagging, and relation extraction within a single structured prompt to produce competition-compliant JSON outputs.
 
-# --- UPDATED ARGUMENT MINING INFERENCE ENGINE (WINDOW=3) ---
+# Multi-Task Argument Mining Inference Engine
+# Orchestrates joint classification, thematic tagging, and relation extraction within a single structured prompt to produce competition-compliant JSON outputs.
+
+# --- PRODUCTION ARGUMENT MINING INFERENCE ENGINE (WINDOW=3) ---
 import json
 import torch
 
@@ -391,7 +394,8 @@ Target JSON Schema:
 
     return tokenizer.decode(output_tokens[0][inputs['input_ids'].shape[-1]:], skip_special_tokens=True)
 
-# --- UPDATED PRODUCTION INFERENCE LOOP (WINDOW=3) ---
+
+# --- FULL PRODUCTION INFERENCE LOOP (89 FILES) ---
 import os
 import json
 from tqdm import tqdm
@@ -401,26 +405,36 @@ TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "data/raw/test-data/")
 FINAL_SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3_final/")
 os.makedirs(FINAL_SUBMISSION_DIR, exist_ok=True)
 
-# Select one file for the "Pilot 2" experiment
+# PRODUCTION RUN: Processing all files
 test_files = sorted([f for f in os.listdir(TEST_DATA_DIR) if f.endswith('.json')])
-pilot_file = [test_files[0]] # Change to 'test_files' for the full 6-hour marathon
+production_files = test_files 
 
-print(f"🚀 PILOT RUN 2: Testing Strict Schema on {pilot_file[0]}...")
+print(f"🚀 PRODUCTION MARATHON START: Processing {len(production_files)} UNESCO Test Files...")
 
-for file_name in pilot_file:
+for file_name in production_files:
+    # Skip if file already processed (allows for resuming interrupted runs)
+    if os.path.exists(os.path.join(FINAL_SUBMISSION_DIR, file_name)):
+        continue
+        
     file_path = os.path.join(TEST_DATA_DIR, file_name)
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # Note: Using 'paragraphs' or 'paras' based on your schema inspection
+    # Note: Structure targets 'paragraphs' as per your schema validation
     paras = data.get('body', {}).get('paragraphs', [])
-    if not paras: continue
+    if not paras: 
+        # Fallback to 'paras' key if dataset schema varies
+        paras = data.get('body', {}).get('paras', [])
+    
+    if not paras:
+        print(f"⚠️ Warning: No paragraphs found in {file_name}")
+        continue
 
     op_indices = []
     pre_indices = []
     history_buffer = [] # Sliding Window Buffer
 
-    for i, p in enumerate(tqdm(paras, desc=f"Analyzing {file_name}")):
+    for i, p in enumerate(tqdm(paras, desc=f"Analyzing {file_name}", leave=False)):
         current_text = p.get('para_en', "")
 
         # Process with strict engine
@@ -459,4 +473,4 @@ for file_name in pilot_file:
     with open(os.path.join(FINAL_SUBMISSION_DIR, file_name), 'w', encoding='utf-8') as out_f:
         json.dump(data, out_f, indent=2)
 
-print(f"🏁 Final Pilot Complete. Verify results in {FINAL_SUBMISSION_DIR}")
+print(f"🏁 PRODUCTION COMPLETE. All {len(production_files)} files stored in {FINAL_SUBMISSION_DIR}")
