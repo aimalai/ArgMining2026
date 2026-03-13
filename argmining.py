@@ -339,23 +339,35 @@ if all_files:
 # Multi-Task Argument Mining Inference Engine
 # Orchestrates joint classification, thematic tagging, and relation extraction within a single structured prompt to produce competition-compliant JSON outputs.
 
+# --- UPDATED ARGUMENT MINING INFERENCE ENGINE (WINDOW=3) ---
 import json
 import torch
 
-def competition_final_processor(text, prev_text, prev_idx, model, tokenizer):
-    # Contextual check for the first paragraph
-    context_info = f"PREVIOUS PARA [Index {prev_idx}]: \"{prev_text}\"" if prev_idx is not None else "This is the start of the document."
+def competition_final_processor(text, context_buffer, model, tokenizer):
+    """
+    UNESCO Legal-Political Analyst Engine: Window-of-3 Edition.
+    context_buffer: A list of dictionaries [{'idx': i, 'text': "..."}] 
+    """
+    
+    # Construct the history string for the prompt
+    if not context_buffer:
+        context_info = "This is the start of the document. No previous context available."
+    else:
+        context_info = "PREVIOUS CONTEXT (Last 3 Paragraphs):\n"
+        for item in context_buffer:
+            context_info += f"- [Index {item['idx']}]: \"{item['text'][:200]}...\"\n"
 
-    # We feed the 'Dimensions' from your CSV directly into the prompt to guide tagging
+    # The updated prompt explicitly asks for multiple matches (The 'Fan' structure)
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are a UNESCO Legal-Political Analyst. Your task is to perform Argument Mining on an Education Conference document.
+You are a UNESCO Legal-Political Analyst. Your task is to perform Multi-Link Argument Mining.
 
 OUTPUT REQUIREMENTS:
 1. TYPE: Classify as 'preambular' or 'operative'.
-2. TAGS: Assign 1-3 labels from the Education Dimensions (e.g., Teachers, Curriculum, Education level, Policy theme).
-3. RELATIONS: Link to Index {prev_idx if prev_idx is not None else 'N/A'}.
-    Types: "supporting", "contradictive", "complemental", "modifying".
-4. THINK: Provide a brief reasoning string for your choices.
+2. TAGS: Assign 1-3 labels from Education Dimensions.
+3. RELATIONS: Look at the PREVIOUS CONTEXT indices. Identify ALL paragraphs the CURRENT PARA relates to.
+    - It is possible to match 0, 1, 2, or all 3 indices (Fan structure).
+    - Relation Types: "supporting", "contradictive", "complemental", "modifying".
+4. THINK: Explain why you linked to specific indices or why you remained independent.
 
 Return JSON ONLY.
 <|eot_id|><|start_header_id|>user<|end_header_id|>
@@ -365,66 +377,54 @@ CURRENT PARA: "{text}"
 Target JSON:
 {{
   "type": "preambular/operative",
-  "tags": ["Tag1", "Tag2"],
-  "matched_paras": {{"{prev_idx if prev_idx is not None else 'null'}": "relation_type"}},
-  "think": "Your step-by-step reasoning here."
+  "tags": ["Tag1"],
+  "matched_paras": {{"index_num": "relation_type", "index_num_2": "relation_type"}},
+  "think": "Reasoning for the multi-link fan structure."
 }}
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():
-        # Keep temperature low for high structural accuracy
-        output_tokens = model.generate(**inputs, max_new_tokens=250, temperature=0.01)
+        output_tokens = model.generate(**inputs, max_new_tokens=300, temperature=0.01)
 
     return tokenizer.decode(output_tokens[0][inputs['input_ids'].shape[-1]:], skip_special_tokens=True)
 
 
-# Production Inference Loop and Leaderboard Serialization
-# Iterates through the UNESCO test dataset to perform high-resolution argument mining, updating resolution metadata and saving final competition-ready JSON files.
-
+# --- UPDATED PRODUCTION INFERENCE LOOP (WINDOW=3) ---
 import os
 import json
-import time
+from tqdm import tqdm
 
-# --- CONFIGURATION ---
-# Adapted for Science Cluster Project Structure
+# Configuration
 TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "data/raw/test-data/")
-FINAL_SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission/")
+FINAL_SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3/")
 os.makedirs(FINAL_SUBMISSION_DIR, exist_ok=True)
 
+# Select one file for the "Pilot Experiment" as requested
 test_files = [f for f in os.listdir(TEST_DATA_DIR) if f.endswith('.json')]
+pilot_file = [test_files[0]] # Change to test_files for full 6-hour run
 
-print(f"🚀 PRO RUN (Take 2): Processing {len(test_files)} UNESCO Test Files...")
+print(f"🚀 PILOT RUN: Testing Window-of-3 on {pilot_file[0]}...")
 
-for f_idx, file_name in enumerate(test_files):
-    # --- So that re-running completed test files doesn't happen ---
-    if os.path.exists(os.path.join(FINAL_SUBMISSION_DIR, file_name)):
-        continue 
-    # ---------------------------------
+for file_name in pilot_file:
     file_path = os.path.join(TEST_DATA_DIR, file_name)
     with open(file_path, 'r') as f:
         data = json.load(f)
 
-    # TARGETING THE CORRECT KEY: 'paragraphs'
     paras = data.get('body', {}).get('paragraphs', [])
-
-    if not paras:
-        print(f"❌ ERROR: No paragraphs found in {file_name}. Still looking for wrong key?")
-        continue
-
-    print(f"📈 [{f_idx+1}/{len(test_files)}] Analyzing {len(paras)} paras in: {file_name}")
+    if not paras: continue
 
     op_indices = []
     pre_indices = []
-    prev_text = None
-    prev_idx = None
+    
+    # --- WINDOW-OF-3 BUFFER MANAGEMENT ---
+    history_buffer = [] # Stores up to 3 previous paragraphs
 
-    for i, p in enumerate(paras):
-        # UNESCO Test Set uses 'para_en'
+    for i, p in enumerate(tqdm(paras, desc=f"Analyzing {file_name}")):
         current_text = p.get('para_en', "")
 
-        # Call our specialized UNESCO engine (Ensure this function is defined!)
-        raw_response = competition_final_processor(current_text, prev_text, prev_idx, model, tokenizer)
+        # Call the updated UNESCO engine with the buffer
+        raw_response = competition_final_processor(current_text, history_buffer, model, tokenizer)
 
         try:
             clean_json = raw_response.strip().replace('```json', '').replace('```', '')
@@ -440,19 +440,19 @@ for f_idx, file_name in enumerate(test_files):
 
         except Exception as e:
             p['type'] = 'header'
+            p['matched_paras'] = {}
 
-        prev_text = current_text
-        prev_idx = i
+        # --- UPDATE BUFFER: Keep only the last 3 ---
+        history_buffer.append({'idx': i, 'text': current_text})
+        if len(history_buffer) > 3:
+            history_buffer.pop(0)
 
-    # Sync the METADATA structure for UZH requirements
+    # Sync Metadata
     data['METADATA']['structure']['preambular_para'] = pre_indices
     data['METADATA']['structure']['operative_para'] = op_indices
-    data['METADATA']['structure']['think'] = "Llama-3.1-8B: UNESCO Education Specialized Run."
+    data['METADATA']['structure']['think'] = "Llama-3.1-8B: Window-of-3 Fan Reconstruction."
 
-    # Save to the new clean folder
     with open(os.path.join(FINAL_SUBMISSION_DIR, file_name), 'w') as out_f:
         json.dump(data, out_f, indent=2)
 
-print(f"🏁 DONE! Real processing complete.")
-
-print("🚀 Pipeline migration to Science Cluster successful.")
+print(f"🏁 Pilot Complete. Check {FINAL_SUBMISSION_DIR} for the multi-link JSON.")
