@@ -345,41 +345,43 @@ import torch
 
 def competition_final_processor(text, context_buffer, model, tokenizer):
     """
-    UNESCO Legal-Political Analyst Engine: Window-of-3 Edition.
-    context_buffer: A list of dictionaries [{'idx': i, 'text': "..."}] 
+    STRICT UZH COMPLIANT ENGINE: Ensures integer keys and valid relation types.
     """
     
-    # Construct the history string for the prompt
+    # Map context to valid string indices for the prompt
+    valid_indices = [str(item['idx']) for item in context_buffer]
+    
     if not context_buffer:
         context_info = "This is the start of the document. No previous context available."
     else:
-        context_info = "PREVIOUS CONTEXT (Last 3 Paragraphs):\n"
+        context_info = f"PREVIOUS CONTEXT (Choose only from these Indices: {', '.join(valid_indices)}):\n"
         for item in context_buffer:
-            context_info += f"- [Index {item['idx']}]: \"{item['text'][:200]}...\"\n"
+            context_info += f"- Index {item['idx']}: \"{item['text'][:200]}...\"\n"
 
-    # The updated prompt explicitly asks for multiple matches (The 'Fan' structure)
+    # Updated prompt with high-pressure schema enforcement
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are a UNESCO Legal-Political Analyst. Your task is to perform Multi-Link Argument Mining.
+You are a UN Document Auditor. Your task is Multi-Link Argument Mining. 
+Return JSON ONLY.
 
-OUTPUT REQUIREMENTS:
-1. TYPE: Classify as 'preambular' or 'operative'.
-2. TAGS: Assign 1-3 labels from Education Dimensions.
-3. RELATIONS: Look at the PREVIOUS CONTEXT indices. Identify ALL paragraphs the CURRENT PARA relates to.
-    - It is possible to match 0, 1, 2, or all 3 indices (Fan structure).
-    - Relation Types: "supporting", "contradictive", "complemental", "modifying".
-4. THINK: Explain why you linked to specific indices or why you remained independent.
+STRICT RULES for 'matched_paras':
+1. Keys MUST be strings representing the integers from this list: {valid_indices}.
+2. Values MUST be exactly one of: "supporting", "contradictive", "complemental", "modifying".
+3. If no relationship exists to any provided index, return {{}}.
+
+STRICT RULES for 'tags':
+Use only official UNESCO Education Dimensions labels.
 
 Return JSON ONLY.
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 {context_info}
 CURRENT PARA: "{text}"
 
-Target JSON:
+Target JSON Schema:
 {{
-  "type": "preambular/operative",
-  "tags": ["Tag1"],
-  "matched_paras": {{"index_num": "relation_type", "index_num_2": "relation_type"}},
-  "think": "Reasoning for the multi-link fan structure."
+  "type": "preambular" or "operative",
+  "tags": ["Tag1", "Tag2"],
+  "matched_paras": {{"IndexString": "RelationType"}},
+  "think": "Brief explanation of choice."
 }}
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
@@ -389,7 +391,6 @@ Target JSON:
 
     return tokenizer.decode(output_tokens[0][inputs['input_ids'].shape[-1]:], skip_special_tokens=True)
 
-
 # --- UPDATED PRODUCTION INFERENCE LOOP (WINDOW=3) ---
 import os
 import json
@@ -397,39 +398,40 @@ from tqdm import tqdm
 
 # Configuration
 TEST_DATA_DIR = os.path.join(PROJECT_ROOT, "data/raw/test-data/")
-FINAL_SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3/")
+FINAL_SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3_final/")
 os.makedirs(FINAL_SUBMISSION_DIR, exist_ok=True)
 
-# Select one file for the "Pilot Experiment" as requested
-test_files = [f for f in os.listdir(TEST_DATA_DIR) if f.endswith('.json')]
-pilot_file = [test_files[0]] # Change to test_files for full 6-hour run
+# Select one file for the "Pilot 2" experiment
+test_files = sorted([f for f in os.listdir(TEST_DATA_DIR) if f.endswith('.json')])
+pilot_file = [test_files[0]] # Change to 'test_files' for the full 6-hour marathon
 
-print(f"🚀 PILOT RUN: Testing Window-of-3 on {pilot_file[0]}...")
+print(f"🚀 PILOT RUN 2: Testing Strict Schema on {pilot_file[0]}...")
 
 for file_name in pilot_file:
     file_path = os.path.join(TEST_DATA_DIR, file_name)
-    with open(file_path, 'r') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
+    # Note: Using 'paragraphs' or 'paras' based on your schema inspection
     paras = data.get('body', {}).get('paragraphs', [])
     if not paras: continue
 
     op_indices = []
     pre_indices = []
-    
-    # --- WINDOW-OF-3 BUFFER MANAGEMENT ---
-    history_buffer = [] # Stores up to 3 previous paragraphs
+    history_buffer = [] # Sliding Window Buffer
 
     for i, p in enumerate(tqdm(paras, desc=f"Analyzing {file_name}")):
         current_text = p.get('para_en', "")
 
-        # Call the updated UNESCO engine with the buffer
+        # Process with strict engine
         raw_response = competition_final_processor(current_text, history_buffer, model, tokenizer)
 
         try:
+            # Clean and parse LLM output
             clean_json = raw_response.strip().replace('```json', '').replace('```', '')
             res = json.loads(clean_json)
 
+            # Map results to original structure
             p['type'] = res.get('type', 'header')
             p['tags'] = res.get('tags', [])
             p['matched_paras'] = res.get('matched_paras', {})
@@ -439,20 +441,22 @@ for file_name in pilot_file:
             if p['type'] == 'preambular': pre_indices.append(i)
 
         except Exception as e:
+            # Fallback for parsing errors to prevent loop crash
             p['type'] = 'header'
             p['matched_paras'] = {}
+            p['think'] = f"Error parsing LLM response: {str(e)}"
 
-        # --- UPDATE BUFFER: Keep only the last 3 ---
+        # Update Buffer: slide the window to keep only last 3
         history_buffer.append({'idx': i, 'text': current_text})
         if len(history_buffer) > 3:
             history_buffer.pop(0)
 
-    # Sync Metadata
+    # Final Metadata Update
     data['METADATA']['structure']['preambular_para'] = pre_indices
     data['METADATA']['structure']['operative_para'] = op_indices
-    data['METADATA']['structure']['think'] = "Llama-3.1-8B: Window-of-3 Fan Reconstruction."
+    data['METADATA']['structure']['think'] = "Llama-3.1-8B: Window-of-3 Fan Reconstruction (Strict Schema)."
 
-    with open(os.path.join(FINAL_SUBMISSION_DIR, file_name), 'w') as out_f:
+    with open(os.path.join(FINAL_SUBMISSION_DIR, file_name), 'w', encoding='utf-8') as out_f:
         json.dump(data, out_f, indent=2)
 
-print(f"🏁 Pilot Complete. Check {FINAL_SUBMISSION_DIR} for the multi-link JSON.")
+print(f"🏁 Final Pilot Complete. Verify results in {FINAL_SUBMISSION_DIR}")
