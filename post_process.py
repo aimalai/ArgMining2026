@@ -836,13 +836,13 @@ import os
 import shutil
 from tqdm import tqdm
 
-# Cluster Path Adaptation
-ORIGINAL_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission/")
-CLEAN_WORKING_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_FINAL_CLEAN/")
+# Cluster Path Adaptation for Ockham
+ORIGINAL_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3_final/")
+CLEAN_WORKING_DIR = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
 
 os.makedirs(CLEAN_WORKING_DIR, exist_ok=True)
 
-print(f"🛡️ PROTECTING DATA: Copying files to {CLEAN_WORKING_DIR}")
+print(f"🛡️ PROTECTING DATA: Mirroring Window-of-3 results to {CLEAN_WORKING_DIR}")
 print("="*60)
 
 files_to_copy = [f for f in os.listdir(ORIGINAL_DIR) if f.endswith('.json')]
@@ -883,7 +883,7 @@ if os.path.exists(source_dir):
 else:
     print(f"❌ ERROR: Working directory {source_dir} not found.")
 
-# --- MASTER SUBMISSION SANITIZATION & RE-ORDERING (V3) ---
+# --- MASTER SUBMISSION SANITIZATION & RE-ORDERING ---
 # 1. matched_paras cleaning | 2. matched_pars removal | 3. body_raw removal | 4. type/tags re-ordering
 
 import os
@@ -891,9 +891,10 @@ import json
 from tqdm import tqdm
 from collections import OrderedDict
 
-source_dir = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_FINAL_CLEAN/")
+# Point strictly to the Ockham clean directory
+source_dir = CLEAN_WORKING_DIR
 
-print("🧹 EXECUTING 4-POINT SANITATION...")
+print("🧹 EXECUTING OCKHAM 4-POINT SANITATION & FAN-LINK CLEANUP...")
 print("="*60)
 
 if os.path.exists(source_dir):
@@ -913,29 +914,36 @@ if os.path.exists(source_dir):
             if 'body_raw' in data['body']:
                 del data['body']['body_raw']
 
-            if 'paras' in data['body']:
+            # Target both 'paragraphs' and 'paras' to be safe
+            p_key = 'paras' if 'paras' in data['body'] else 'paragraphs'
+            if p_key in data['body']:
                 new_paras = []
-                for p in data['body']['paras']:
+                for i, p in enumerate(data['body'][p_key]):
+                    # CLEAN MATCHED_PARAS: Remove self-links and non-digit noise
                     rel = p.get('matched_paras', {})
-                    cleaned_rel = {str(k): v for k, v in rel.items() if str(k).isdigit()} if isinstance(rel, dict) else {}
+                    cleaned_rel = {str(k): v for k, v in rel.items() if str(k).isdigit() and int(k) != i}
 
                     ordered_p = OrderedDict()
-                    ordered_p["para_number"] = p.get("para_number")
-                    ordered_p["para"] = p.get("para")
-                    ordered_p["type"] = p.get("type")
+                    ordered_p["para_number"] = p.get("para_number", i + 1)
+                    ordered_p["para"] = p.get("para", p.get("para_en", ""))
+                    ordered_p["type"] = p.get("type", "header")
                     ordered_p["tags"] = p.get("tags", [])
                     ordered_p["matched_paras"] = cleaned_rel
                     ordered_p["think"] = p.get("think", "")
                     ordered_p["para_en"] = p.get("para_en", "")
                     new_paras.append(ordered_p)
+                
+                # Standardize to 'paras' key
                 data['body']['paras'] = new_paras
+                if 'paragraphs' in data['body']: del data['body']['paragraphs']
+        
+        # Update Meta logic
+        data['METADATA']['structure']['think'] = "Ockham Window-of-3 Fan Architecture: NF4 8B Quantized."
 
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
-    print("\n✅ SANITIZATION COMPLETE")
-else:
-    print(f"❌ ERROR: Source directory {source_dir} not found.")
+    print("\n✅ OCKHAM SANITIZATION COMPLETE")
 
 # FINAL SUBMISSION ARCHIVING AND EXPORT
 # Compresses the validated JSON results into a standardized ZIP archive and moves the final package to the dedicated submissions folder for streamlined Shared Task competition leaderboard upload.
@@ -943,15 +951,17 @@ else:
 import shutil
 import os
 
-source_dir = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_FINAL_CLEAN/")
+source_dir = CLEAN_WORKING_DIR
 submission_folder = os.path.join(PROJECT_ROOT, "submissions/")
-output_path = os.path.join(submission_folder, "UZH_SharedTask_Submission_Gemini_Final")
+output_path = os.path.join(submission_folder, "ockham")
 
 os.makedirs(submission_folder, exist_ok=True)
 
 if os.path.exists(source_dir):
-    print(f"📦 PACKAGING: Compressing files from {source_dir}...")
+    print(f"📦 PACKAGING: Creating {output_path}.zip...")
     shutil.make_archive(output_path, 'zip', source_dir)
+    # Create copy as requested
+    shutil.copy2(f"{output_path}.zip", f"{output_path}_copy.zip")
     print(f"🎁 SUCCESS! Your submission is located at: {output_path}.zip")
 else:
     print(f"❌ ERROR: Source directory {source_dir} not found.")
@@ -963,7 +973,7 @@ import os
 import json
 from tqdm import tqdm
 
-target_dir = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_FINAL_CLEAN/")
+target_dir = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
 REQUIRED_PARA_KEYS = ["para_number", "para", "type", "tags", "matched_paras", "think", "para_en"]
 FORBIDDEN_KEYS = ["body_raw", "matched_pars", "matched_para"]
 
