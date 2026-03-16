@@ -56,10 +56,51 @@ python post_process.py
 
 ## 📊 Evaluation Schema
 
-Our outputs conform strictly to the UZH Shared Task JSON specification:
+Our outputs conform strictly to the UZH Shared Task Argmining 2026 JSON specification:
 
-- `METADATA.structure`: Tracks the lists of operative and preambular paragraph indices.
-- `body.paras`: Contains the paragraph-level classification, multi-label tagging (UNESCO Dimensions), and argumentative relation dictionaries.
+
+```json
+{
+  "TEXT_ID": "ICPE-25-1962_RES1-FR_res_54",
+  "RECOMMENDATION": 54,
+  "TITLE": "LA PLANIFICATION DE L'ÉDUCATION",
+  "METADATA": {
+    "structure": {
+      "doc_title": "ICPE-25-1962_RES1-FR",
+      "nb_paras": 58,
+      "preambular_para": [], 
+      "operative_para": [],   
+      "think": ""
+    }
+  },
+  "body": {
+    "paras": [
+      {
+        "para_number": 1,
+        "para": "La Conférence internationale de l'instruction publique, Convoquée à...",
+        "type": null,
+        "tags": [],
+        "matched_paras": {},
+        "think": "",
+        "para_en": "The International Conference on Education, convened in..."
+      }
+    ]
+  }
+}
+```
+
+METADATA.structure:
+
+-preambular_paras: list of paragraph indices (int) classified as preambular
+-operative_paras: list of paragraph indices (int) classified as operative
+-think: string describing the reasoning process (e.g., LLM thinking output)
+
+paras:
+
+-type: "preambular" or "operative"
+-tags: list of tag labels (strings), one than more tags from different dimensions and categories are possible.
+-matched_paras: dictionary of paragraph indices (int) linked by content or reference as keys, and relation types ("contradictive", "supporting", "complemental", "modifying") as values
+-think: string describing the reasoning process (e.g., LLM thinking output)
 
 ## ⚖️ License
 
