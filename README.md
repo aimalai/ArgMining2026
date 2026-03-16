@@ -88,10 +88,6 @@ Our outputs conform strictly to the UZH Shared Task Argmining 2026 JSON specific
   }
 }
 ```
-
-Here you go, Malai — clean, GitHub‑friendly **Markdown** that will render exactly as you expect.  
-I’ve formatted it using proper lists, indentation, and section headers so nothing collapses or disappears in the README.
-
 ---
 
 ## Field‑Level Specification
