@@ -6,11 +6,11 @@
 
 This repository contains the official system implementation for the UZH 2026 Shared Task on reconstructing argumentative reasoning in United Nations and UNESCO resolutions.
 
-Our approach focuses on **Semantic Entropy Pruning**, an optimization strategy designed to maintain high-fidelity reasoning on edge-tier open-weight hardware while adhering to the shared task's constraint of models ≤ 8B parameters.
+My approach focuses on **Semantic Entropy Pruning**, an optimization strategy designed to maintain high-fidelity reasoning on edge-tier open-weight hardware while adhering to the shared task's constraint of models ≤ 8B parameters.
 
 ## 🚀 System Architecture: Window-of-3 Fan Reconstruction
 
-To meet the shared task's requirements for predicting multi-link argumentative relations, our system implements a **Sliding Context Window (n=3)**. Unlike standard pairwise chains, this architecture allows the model to identify "Fan" structures where a single operative paragraph supports or modifies multiple preceding preambular clauses.
+To meet the shared task's requirements for predicting multi-link argumentative relations, my system implements a **Sliding Context Window (n=3)**. Unlike standard pairwise chains, this architecture allows the model to identify "Fan" structures where a single operative paragraph supports or modifies multiple preceding preambular clauses.
 
 ### Key Features:
 
@@ -56,7 +56,7 @@ python post_process.py
 
 ## 📊 Evaluation Schema
 
-Our outputs conform strictly to the UZH Shared Task Argmining 2026 JSON specification:
+My outputs conform strictly to the UZH Shared Task Argmining 2026 JSON specification:
 
 
 ```json
