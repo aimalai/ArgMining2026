@@ -24,8 +24,8 @@ The system is designed to run on a High-Performance Computing (HPC) Science Clus
 
 ```bash
 # Clone the repository
-git clone https://github.com/Ockham-ArgMining/ArgMining-2026-UZH
-cd ArgMining-2026-UZH
+git clone https://github.com/aimalai/ArgMining2026
+cd ArgMining2026
 
 # Install required libraries
 pip install torch transformers bitsandbytes accelerate tqdm pandas scipy
