@@ -41,13 +41,13 @@ The processing is split into two stages: Inference and Sanitization.
 Run the main processing script to generate predictions for the 89 UNESCO test resolutions. The script utilizes Llama-3.1-8B-Instruct with a sliding window buffer of 3 previous paragraphs.
 
 ```bash
-python main_inference.py
+python argmining.py
 
 ```
 
 ### 2. Post-Processing & Sanitization
 
-After inference, run the sanitization suite to align the JSON schema with official UZH requirements (e.g., key remapping from `paragraphs` to `paras` and field re-ordering).
+After production run, run the experiments and sanitization suite to align the JSON schema with official UZH requirements (e.g., key remapping from `paragraphs` to `paras` and field re-ordering).
 
 ```bash
 python post_process.py
