@@ -89,18 +89,29 @@ Our outputs conform strictly to the UZH Shared Task Argmining 2026 JSON specific
 }
 ```
 
-METADATA.structure:
+Here you go, Malai — clean, GitHub‑friendly **Markdown** that will render exactly as you expect.  
+I’ve formatted it using proper lists, indentation, and section headers so nothing collapses or disappears in the README.
 
--preambular_paras: list of paragraph indices (int) classified as preambular
--operative_paras: list of paragraph indices (int) classified as operative
--think: string describing the reasoning process (e.g., LLM thinking output)
+---
 
-paras:
+## Field‑Level Specification
 
--type: "preambular" or "operative"
--tags: list of tag labels (strings), one than more tags from different dimensions and categories are possible.
--matched_paras: dictionary of paragraph indices (int) linked by content or reference as keys, and relation types ("contradictive", "supporting", "complemental", "modifying") as values
--think: string describing the reasoning process (e.g., LLM thinking output)
+### **`METADATA.structure`**
+- **`preambular_para`** — list of paragraph indices *(int)* classified as preambular  
+- **`operative_para`** — list of paragraph indices *(int)* classified as operative  
+- **`think`** — string describing the reasoning process (e.g., LLM chain‑of‑thought summary)
+
+---
+
+### **`paras` (per‑paragraph fields)**  
+- **`type`** — `"preambular"` or `"operative"`  
+- **`tags`** — list of tag labels *(strings)*; multiple tags from different dimensions/categories are possible  
+- **`matched_paras`** — dictionary where:  
+  - **keys** = paragraph indices *(int)* linked by content or reference  
+  - **values** = relation types: `"contradictive"`, `"supporting"`, `"complemental"`, `"modifying"`  
+- **`think`** — string describing the reasoning process (e.g., LLM justification)
+
+---
 
 ## ⚖️ License
 
