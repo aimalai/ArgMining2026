@@ -401,7 +401,7 @@ elite_10 = [
     "A-RES-77-248-fr-parsed.json", "HRI-CORE-SLE-2012-fr-parsed.json"
 ]
 
-print(f"☢️ SURVIVAL RUN: 100 PARAS PER FILE | UNITS LEFT: 31")
+print(f"☢️ SURVIVAL RUN: 100 PARAS PER FILE")
 print("="*60)
 
 for filename in elite_10:
