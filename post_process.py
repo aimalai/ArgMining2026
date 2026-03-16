@@ -247,8 +247,22 @@ for filename in tqdm(all_files, desc="V7 Precision Final"):
     with open(file_path, 'r') as f: data = json.load(f)
     p_key = 'paras' if 'paras' in data['body'] else 'paragraphs'
     for para in data['body'][p_key]:
+
+        # --- WINDOW-OF-3 INDEX FIX ---
+        if 'matched_paras' in para and isinstance(para['matched_paras'], dict):
+            corrected = {}
+            for k, v in para['matched_paras'].items():
+                try:
+                    corrected[str(int(k) + 1)] = v
+                except:
+                    continue
+            para['matched_paras'] = corrected
+        # --------------------------------
+
         para['tags'] = get_tags_v7(para.get('para',''), para.get('think',''), para.get('type','operative'))
+
     with open(file_path, 'w') as f: json.dump(data, f, indent=2)
+
 
 print("\n🚀 V7 REPAIR COMPLETE. Scores now stabilize in the high 0.70s.")
 
