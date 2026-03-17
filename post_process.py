@@ -68,8 +68,19 @@ import json
 
 # --- CONFIGURATION ---
 # Adapted for Science Cluster paths
-SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3_final/")
-all_files = [f for f in os.listdir(SUBMISSION_DIR) if f.endswith('.json')]
+import shutil
+ORIGINAL_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3_final/")
+SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
+os.makedirs(SUBMISSION_DIR, exist_ok=True)
+
+# Safely mirror the raw data into the clean folder FIRST
+print(f"🛡️ PROTECTING DATA: Mirroring Window-of-3 results to {SUBMISSION_DIR}")
+print("="*60)
+for filename in os.listdir(ORIGINAL_DIR):
+    if filename.endswith('.json'):
+        shutil.copy2(os.path.join(ORIGINAL_DIR, filename), os.path.join(SUBMISSION_DIR, filename))
+
+all_files = sorted([f for f in os.listdir(SUBMISSION_DIR) if f.endswith('.json')])
 
 # 1. THE STRATIFIED SELECTION
 # Decade Sweep: Pick files from different eras
@@ -91,7 +102,7 @@ longest_file = max(file_lengths, key=lambda x: x[1])[0]
 audit_selection["Length Stress-Test"] = longest_file
 
 # 2. THE PRO AUDITOR LOOP
-print(f"🕵️ STRATEGIC AUDIT: {len(audit_selection)} FILES SELECTED")
+print(f"\n🕵️ STRATEGIC AUDIT: {len(audit_selection)} FILES SELECTED")
 print("="*70)
 
 for reason, filename in audit_selection.items():
@@ -128,11 +139,6 @@ for reason, filename in audit_selection.items():
 import os
 import json
 import random
-
-# --- CONFIGURATION ---
-# Adapted for Science Cluster paths
-SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
-all_files = sorted([f for f in os.listdir(SUBMISSION_DIR) if f.endswith('.json')])
 
 # 1. THE DIVERSIFIED SELECTION
 decades = {"1930s": "193", "1960s": "196", "2000s": "200"}
@@ -271,19 +277,16 @@ print("\n🚀 V7 REPAIR COMPLETE. Scores now stabilize in the high 0.70s.")
 
 import os
 
-# Path to your clean results
-source_dir = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
-
 print("🔍 SCANNING FOR CORRUPTED/EMPTY FILES...")
 print("-" * 50)
 
 small_files = []
 total_files = 0
 
-for filename in os.listdir(source_dir):
+for filename in os.listdir(SUBMISSION_DIR):
     if filename.endswith(".json"):
         total_files += 1
-        file_path = os.path.join(source_dir, filename)
+        file_path = os.path.join(SUBMISSION_DIR, filename)
         file_size_kb = os.path.getsize(file_path) / 1024
 
         if file_size_kb < 2:
@@ -291,7 +294,6 @@ for filename in os.listdir(source_dir):
 
 if not small_files:
     print(f"✅ ALL CLEAR! All {total_files} files are over 2KB.")
-    print("🚀 You are safe to upload the zip to the UZH portal.")
 else:
     print(f"⚠️ WARNING: Found {len(small_files)} files under 2KB:")
     for name, size in small_files:
@@ -309,7 +311,7 @@ all_train_files = [f for f in os.listdir(TRAIN_DIR) if f.endswith('.json')]
 # Sort by file size to find the longest documents
 elite_10 = sorted(all_train_files, key=lambda f: os.path.getsize(os.path.join(TRAIN_DIR, f)), reverse=True)[:10]
 
-print(f"🎯 Elite 10 selected. Total size: {sum(os.path.getsize(os.path.join(TRAIN_DIR, f)) for f in elite_10)/1024:.2f} KB")
+print(f"\n🎯 Elite 10 selected. Total size: {sum(os.path.getsize(os.path.join(TRAIN_DIR, f)) for f in elite_10)/1024:.2f} KB")
 for i, f in enumerate(elite_10):
     print(f"{i+1}. {f}")
 
@@ -319,7 +321,6 @@ for i, f in enumerate(elite_10):
 import json
 import os
 
-TRAIN_DIR = os.path.join(PROJECT_ROOT, "data/raw/train-data/")
 elite_10 = [
     "E-2ND-SESS.-RESOLUTIONS-fr-parsed.json", "HRI-CORE-SRB-2022-fr-parsed.json",
     "HRI-CORE-SRB-2010-fr-parsed.json", "S-RES-2231-(2015)-fr-parsed.json",
@@ -331,7 +332,7 @@ elite_10 = [
 total_paras = 0
 file_counts = {}
 
-print("📊 ELITE 10 PARAGRAPH AUDIT")
+print("\n📊 ELITE 10 PARAGRAPH AUDIT")
 print("-" * 30)
 
 for filename in elite_10:
@@ -403,19 +404,10 @@ import pandas as pd
 from tqdm import tqdm
 
 # --- CONFIGURATION ---
-TRAIN_DIR = os.path.join(PROJECT_ROOT, "data/raw/train-data/")
 SCIENCE_OUT = os.path.join(PROJECT_ROOT, "experiments/science_results/")
 os.makedirs(SCIENCE_OUT, exist_ok=True)
 
-elite_10 = [
-    "E-2ND-SESS.-RESOLUTIONS-fr-parsed.json", "HRI-CORE-SRB-2022-fr-parsed.json",
-    "HRI-CORE-SRB-2010-fr-parsed.json", "S-RES-2231-(2015)-fr-parsed.json",
-    "HRI-CORE-SVN-2020-fr-parsed.json", "A-RES-76-258-fr-parsed.json",
-    "HRI-CORE-SVN-2014-fr-parsed.json", "HRI-CORE-SLV-2011-fr-parsed.json",
-    "A-RES-77-248-fr-parsed.json", "HRI-CORE-SLE-2012-fr-parsed.json"
-]
-
-print(f"☢️ SURVIVAL RUN: 100 PARAS PER FILE")
+print(f"\n☢️ SURVIVAL RUN: 100 PARAS PER FILE")
 print("="*60)
 
 for filename in elite_10:
@@ -471,7 +463,7 @@ import numpy as np
 def run_scientific_audit(csv_path):
     df = pd.read_csv(csv_path)
 
-    print("🧪 SCIENTIFIC AUDIT RESULTS")
+    print("\n🧪 SCIENTIFIC AUDIT RESULTS")
     print("="*40)
 
     # 1. Efficiency Benchmarking
@@ -548,7 +540,7 @@ pruner_path = os.path.join(PROJECT_ROOT, 'src/pruners/semantic_pruner.py')
 with open(pruner_path, 'w') as f:
     f.write(pruner_script)
 
-print("📂 PROJECT ORGANIZED: Data and source code are now modularized.")
+print("\n📂 PROJECT ORGANIZED: Data and source code are now modularized.")
 
 # Context-Pruning Ablation Study
 # Executes a comparative performance analysis between pruned and high-density context windows to quantify the latency reduction and computational speedup achieved by the lean inference architecture.
@@ -556,7 +548,7 @@ print("📂 PROJECT ORGANIZED: Data and source code are now modularized.")
 import time
 
 def run_ablation_study(sample_text, prev_text, model, tokenizer):
-    print("🔬 RUNNING ABLATION STUDY: PRUNED vs. FULL CONTEXT")
+    print("\n🔬 RUNNING ABLATION STUDY: PRUNED vs. FULL CONTEXT")
 
     # 1. PRUNED RUN (Your Innovation)
     start = time.perf_counter()
@@ -594,7 +586,7 @@ final_boss_file = "E-2ND-SESS.-RESOLUTIONS-fr-parsed.json"
 TRAIN_DIR = os.path.join(PROJECT_ROOT, "data/raw/train-data/")
 
 def golden_chart_experiment(file_name, limit=20):
-    print(f"🚀 GENERATING THE GOLDEN CHART DATA: {file_name}")
+    print(f"\n🚀 GENERATING THE GOLDEN CHART DATA: {file_name}")
     print("="*60)
 
     path = os.path.join(TRAIN_DIR, file_name)
@@ -692,7 +684,7 @@ def generate_roi_chart():
     # plt.show() 
 
     savings = (standard_costs[-1] - pruned_costs[-1]) / standard_costs[-1] * 100
-    print(f"💰 ROI ANALYSIS: At 1,000 paragraphs, your system is {savings:.1f}% cheaper than standard cumulative RAG.")
+    print(f"\n💰 ROI ANALYSIS: At 1,000 paragraphs, your system is {savings:.1f}% cheaper than standard cumulative RAG.")
 
 generate_roi_chart()
 
@@ -768,7 +760,7 @@ TEST_FILES = [os.path.join(TEST_DIR, f) for f in FILE_NAMES]
 PRICE_PER_1K_TOKENS = 0.00015
 
 def run_official_paper_benchmark(model, tokenizer, limit_paras=3):
-    print("🚀 INITIATING RESEARCH BENCHMARK: FULL vs. PRUNED CONTEXT")
+    print("\n🚀 INITIATING RESEARCH BENCHMARK: FULL vs. PRUNED CONTEXT")
     print("="*80)
 
     experiment_results = []
@@ -843,30 +835,6 @@ def run_official_paper_benchmark(model, tokenizer, limit_paras=3):
 # Execute
 run_official_paper_benchmark(model, tokenizer)
 
-# SUBMISSION DATA MIRRORING AND IMMUTABLE SOURCE PRESERVATION
-# This cell creates a persistent secondary copy of the 89 raw inference outputs to serve as an untouched reference point, allowing for safe experimentation with post-processing sanitization scripts without risking the loss of the original AI reasoning data.
-
-import os
-import shutil
-from tqdm import tqdm
-
-# Cluster Path Adaptation for Ockham
-ORIGINAL_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3_final/")
-CLEAN_WORKING_DIR = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
-
-os.makedirs(CLEAN_WORKING_DIR, exist_ok=True)
-
-print(f"🛡️ PROTECTING DATA: Mirroring Window-of-3 results to {CLEAN_WORKING_DIR}")
-print("="*60)
-
-files_to_copy = [f for f in os.listdir(ORIGINAL_DIR) if f.endswith('.json')]
-
-for filename in tqdm(files_to_copy, desc="Mirroring Files"):
-    source_path = os.path.join(ORIGINAL_DIR, filename)
-    destination_path = os.path.join(CLEAN_WORKING_DIR, filename)
-    shutil.copy2(source_path, destination_path)
-
-print("\n✅ BACKUP COMPLETE.")
 
 # SUBMISSION SCHEMA ALIGNMENT WITH SHARED TASK SPECIFICATIONS
 # Programmatically refactors the JSON structure to comply with official evaluation specifications by renaming the paragraph collection key from 'paragraphs' to 'paras'.
@@ -875,16 +843,14 @@ import os
 import json
 from tqdm import tqdm
 
-source_dir = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
-
-print("🔧 INITIATING SCHEMA CORRECTION: 'paragraphs' -> 'paras'")
+print("\n🔧 INITIATING SCHEMA CORRECTION: 'paragraphs' -> 'paras'")
 print("="*60)
 
-if os.path.exists(source_dir):
-    all_files_clean = [f for f in os.listdir(source_dir) if f.endswith('.json')]
+if os.path.exists(SUBMISSION_DIR):
+    all_files_clean = [f for f in os.listdir(SUBMISSION_DIR) if f.endswith('.json')]
 
     for filename in tqdm(all_files_clean, desc="Updating Schema"):
-        file_path = os.path.join(source_dir, filename)
+        file_path = os.path.join(SUBMISSION_DIR, filename)
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
@@ -895,7 +861,7 @@ if os.path.exists(source_dir):
 
     print("\n✅ SCHEMA UPDATE COMPLETE.")
 else:
-    print(f"❌ ERROR: Working directory {source_dir} not found.")
+    print(f"❌ ERROR: Working directory {SUBMISSION_DIR} not found.")
 
 # --- MASTER SUBMISSION SANITIZATION & RE-ORDERING ---
 # 1. matched_paras cleaning | 2. matched_pars removal | 3. body_raw removal | 4. type/tags re-ordering | 5. Ockham Link Alignment
@@ -952,17 +918,14 @@ def ockham_link_aligner(para_text, matched_paras_dict, think_text):
     return refined_dict, appended_think
 
 
-# Point strictly to the Ockham clean directory
-source_dir = CLEAN_WORKING_DIR
-
-print("🧹 EXECUTING OCKHAM SANITATION & FAN-LINK CLEANUP...")
+print("\n🧹 EXECUTING OCKHAM SANITATION & FAN-LINK CLEANUP...")
 print("="*60)
 
-if os.path.exists(source_dir):
-    all_files_sanitize = [f for f in os.listdir(source_dir) if f.endswith('.json')]
+if os.path.exists(SUBMISSION_DIR):
+    all_files_sanitize = [f for f in os.listdir(SUBMISSION_DIR) if f.endswith('.json')]
 
     for filename in tqdm(all_files_sanitize, desc="Polishing JSONs"):
-        path = os.path.join(source_dir, filename)
+        path = os.path.join(SUBMISSION_DIR, filename)
         if os.path.getsize(path) == 0: continue
 
         try:
@@ -1024,20 +987,19 @@ if os.path.exists(source_dir):
 import shutil
 import os
 
-source_dir = CLEAN_WORKING_DIR
 submission_folder = os.path.join(PROJECT_ROOT, "submissions/")
 output_path = os.path.join(submission_folder, "ockham")
 
 os.makedirs(submission_folder, exist_ok=True)
 
-if os.path.exists(source_dir):
-    print(f"📦 PACKAGING: Creating {output_path}.zip...")
-    shutil.make_archive(output_path, 'zip', source_dir)
+if os.path.exists(SUBMISSION_DIR):
+    print(f"\n📦 PACKAGING: Creating {output_path}.zip...")
+    shutil.make_archive(output_path, 'zip', SUBMISSION_DIR)
     # Create copy as requested
     shutil.copy2(f"{output_path}.zip", f"{output_path}_copy.zip")
     print(f"🎁 SUCCESS! Your submission is located at: {output_path}.zip")
 else:
-    print(f"❌ ERROR: Source directory {source_dir} not found.")
+    print(f"❌ ERROR: Source directory {SUBMISSION_DIR} not found.")
 
 # --- VALIDATOR SCRIPT ---
 # This script ensures the output JSONs match the official UZH "Fixed Schema" (paras, type, tags, matched_paras) and contain no disqualifying artifacts like 'body_raw', 'null' strings, or typo keys.
@@ -1046,19 +1008,18 @@ import os
 import json
 from tqdm import tqdm
 
-target_dir = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
 REQUIRED_PARA_KEYS = ["para_number", "para", "type", "tags", "matched_paras", "think", "para_en"]
 FORBIDDEN_KEYS = ["body_raw", "matched_pars", "matched_para"]
 
-print(f"🔍 DIAGNOSING SUBMISSION: {target_dir}")
+print(f"\n🔍 DIAGNOSING SUBMISSION: {SUBMISSION_DIR}")
 print("="*70)
 
 report = {"Corrupt/Empty": [], "RootKeyError": [], "ForbiddenKeysFound": [], "BadOrdering": [], "RelationNoise": []}
 
-if os.path.exists(target_dir):
-    for filename in tqdm(os.listdir(target_dir), desc="Analyzing"):
+if os.path.exists(SUBMISSION_DIR):
+    for filename in tqdm(os.listdir(SUBMISSION_DIR), desc="Analyzing"):
         if not filename.endswith('.json'): continue
-        path = os.path.join(target_dir, filename)
+        path = os.path.join(SUBMISSION_DIR, filename)
         if os.path.getsize(path) == 0:
             report["Corrupt/Empty"].append(filename)
             continue
