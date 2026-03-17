@@ -68,7 +68,7 @@ import json
 
 # --- CONFIGURATION ---
 # Adapted for Science Cluster paths
-SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission/")
+SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_window3_final/")
 all_files = [f for f in os.listdir(SUBMISSION_DIR) if f.endswith('.json')]
 
 # 1. THE STRATIFIED SELECTION
@@ -875,7 +875,7 @@ import os
 import json
 from tqdm import tqdm
 
-source_dir = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission_FINAL_CLEAN/")
+source_dir = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
 
 print("🔧 INITIATING SCHEMA CORRECTION: 'paragraphs' -> 'paras'")
 print("="*60)
@@ -1017,7 +1017,7 @@ if os.path.exists(source_dir):
 
     print("\n✅ OCKHAM SANITIZATION COMPLETE")
 
-    
+
 # FINAL SUBMISSION ARCHIVING AND EXPORT
 # Compresses the validated JSON results into a standardized ZIP archive and moves the final package to the dedicated submissions folder for streamlined Shared Task competition leaderboard upload.
 
