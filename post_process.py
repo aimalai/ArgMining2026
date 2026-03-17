@@ -131,7 +131,7 @@ import random
 
 # --- CONFIGURATION ---
 # Adapted for Science Cluster paths
-SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission/")
+SUBMISSION_DIR = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean//")
 all_files = sorted([f for f in os.listdir(SUBMISSION_DIR) if f.endswith('.json')])
 
 # 1. THE DIVERSIFIED SELECTION
@@ -272,7 +272,7 @@ print("\n🚀 V7 REPAIR COMPLETE. Scores now stabilize in the high 0.70s.")
 import os
 
 # Path to your clean results
-source_dir = os.path.join(PROJECT_ROOT, "submissions/leaderboard_submission/")
+source_dir = os.path.join(PROJECT_ROOT, "submissions/ockham_final_clean/")
 
 print("🔍 SCANNING FOR CORRUPTED/EMPTY FILES...")
 print("-" * 50)
