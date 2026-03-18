@@ -943,9 +943,19 @@ if os.path.exists(SUBMISSION_DIR):
             if p_key in data['body']:
                 new_paras = []
                 for i, p in enumerate(data['body'][p_key]):
-                    # CLEAN MATCHED_PARAS: Remove self-links and non-digit noise
+                    
+                    current_num = p.get("para_number", i + 1)
+                    
+                    # 🛑 STRICT WINDOW-OF-3 FILTER & CLEANUP
+                    # This replaces the buggy self-link check that deleted valid data
                     rel = p.get('matched_paras', {})
-                    cleaned_rel = {str(k): v for k, v in rel.items() if str(k).isdigit() and int(k) != i}
+                    cleaned_rel = {}
+                    for k, v in rel.items():
+                        if str(k).isdigit():
+                            target_idx = int(k)
+                            # Must look BACKWARDS, max 3 steps (e.g., if current is 6, keep 5, 4, 3)
+                            if target_idx < current_num and target_idx >= (current_num - 3):
+                                cleaned_rel[str(target_idx)] = v
 
                     # --- OCKHAM LINK ALIGNER ---
                     para_text = p.get("para", p.get("para_en", ""))
@@ -959,7 +969,7 @@ if os.path.exists(SUBMISSION_DIR):
                     # ---------------------------
 
                     ordered_p = OrderedDict()
-                    ordered_p["para_number"] = p.get("para_number", i + 1)
+                    ordered_p["para_number"] = current_num
                     ordered_p["para"] = para_text
                     ordered_p["type"] = p.get("type", "header")
                     ordered_p["tags"] = p.get("tags", [])
@@ -979,7 +989,6 @@ if os.path.exists(SUBMISSION_DIR):
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     print("\n✅ OCKHAM SANITIZATION COMPLETE")
-
 
 # FINAL SUBMISSION ARCHIVING AND EXPORT
 # Compresses the validated JSON results into a standardized ZIP archive and moves the final package to the dedicated submissions folder for streamlined Shared Task competition leaderboard upload.
